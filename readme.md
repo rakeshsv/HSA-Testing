@@ -1,6 +1,6 @@
 
 Build instructions:
-  - mkdir build
+  - cd HSA-Testing
   - cmake ./ -B./build ( use cmake3 if centos)
   - make -C ./build
   
