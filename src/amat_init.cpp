@@ -151,17 +151,23 @@ hsa_status_t ProcessAgent(hsa_agent_t agent, void* data) {
 
   switch (device_type) {
     case HSA_DEVICE_TYPE_CPU : {
+	    std::cout <<"\n HSA device type CPU detected";
       agent_info.agent_device_type = "CPU";
       break;
     };
     case HSA_DEVICE_TYPE_GPU : {
+	    std::cout <<"\n HSA device type GPU detected";
       agent_info.agent_device_type = "GPU";
       break;
     };
     case HSA_DEVICE_TYPE_DSP : {
+	    std::cout <<"\n HSA device type DSP detected";
       agent_info.agent_device_type = "DSP";
       break;
     };
+    default:
+	    std::cout <<"\n HSA device unknown device detected" << device_type;
+     break;
   }
 
   // add agent to list
@@ -389,7 +395,7 @@ void InitAgents() {
 	       std::cout << "\n Processing memory pool failed";
          return;
        }
-       std::cout << " \n  Device Type : " << agent_list[i].agent_device_type;
+       std::cout << " \n Device Type : " << agent_list[i].agent_device_type << "  Index : "<< i;
   }
 }
 
