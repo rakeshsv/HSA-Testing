@@ -42,37 +42,16 @@ add_compile_options(-std=c++11)
 add_compile_options(-pthread)
 add_compile_options(-Wall)
 add_compile_options(-DRVS_OS_TYPE_NUM=${RVS_OS_TYPE_NUM})
-if (RVS_COVERAGE)
-  add_compile_options(-o0 -fprofile-arcs -ftest-coverage)
-  set(CMAKE_EXE_LINKER_FLAGS "--coverage")
-  set(CMAKE_SHARED_LINKER_FLAGS "--coverage")
-endif()
 
 ## Set default module path if not already set
 if ( NOT DEFINED CMAKE_MODULE_PATH )
     set ( CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake_modules/" )
 endif ()
 
-set ( BUILD_VERSION_MAJOR ${VERSION_MAJOR} )
-set ( BUILD_VERSION_MINOR ${VERSION_MINOR} )
-set ( BUILD_VERSION_PATCH ${VERSION_PATCH} )
-set ( LIB_VERSION_STRING "${BUILD_VERSION_MAJOR}.${BUILD_VERSION_MINOR}.${BUILD_VERSION_PATCH}" )
-
 set(ROCM_PATH "/opt/rocm" CACHE STRING "ROCM install path")
 
-if ( DEFINED VERSION_BUILD AND NOT ${VERSION_BUILD} STREQUAL "" )
-    set ( BUILD_VERSION_PATCH "${BUILD_VERSION_PATCH}-${VERSION_BUILD}" )
-endif ()
-set ( BUILD_VERSION_STRING "${BUILD_VERSION_MAJOR}.${BUILD_VERSION_MINOR}.${BUILD_VERSION_PATCH}" )
-
-## make version numbers visible to C code
-add_compile_options(-DBUILD_VERSION_MAJOR=${VERSION_MAJOR})
-add_compile_options(-DBUILD_VERSION_MINOR=${VERSION_MINOR})
-add_compile_options(-DBUILD_VERSION_PATCH=${VERSION_PATCH})
-add_compile_options(-DLIB_VERSION_STRING="${LIB_VERSION_STRING}")
-add_compile_options(-DBUILD_VERSION_STRING="${BUILD_VERSION_STRING}")
-
 set(ROCR_INC_DIR "${ROCM_PATH}/include" CACHE PATH "Contains header files exported by ROC Runtime")
+
 ## define include directories
 include_directories(./ ../ pci ${ROCR_INC_DIR})
 
