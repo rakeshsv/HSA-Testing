@@ -97,12 +97,12 @@ uint64_t time_diff(
  *
  * */
 double GetCopyTime( hsa_signal_t signal_fwd) {
-  hsa_status_t status;
   // Obtain time taken for forward copy
   hsa_amd_profiling_async_copy_time_t async_time_fwd {0};
 
   if (HSA_STATUS_SUCCESS != hsa_amd_profiling_get_async_copy_time(signal_fwd, &async_time_fwd)){
       std::cout << "\n Copy time failed"; 
+      return -1;
   }
 
   return(async_time_fwd.end - async_time_fwd.start);
@@ -123,7 +123,6 @@ hsa_status_t ProcessAgent(hsa_agent_t agent, void* data) {
   string log_msg, log_agent_name;
   hsa_device_type_t device_type;
   AgentInformation agent_info;
-  hsa_status_t status;
   char agent_name[64];
   uint32_t node;
 
@@ -134,15 +133,18 @@ hsa_status_t ProcessAgent(hsa_agent_t agent, void* data) {
   // Get the name of the agent
   if (HSA_STATUS_SUCCESS != hsa_agent_get_info(agent, HSA_AGENT_INFO_NAME, agent_name)) {
 	  std::cout << "\n HSA get agent name failed";
+    return HSA_STATUS_ERROR; 
   }
 
   // Get device type
   if (HSA_STATUS_SUCCESS != hsa_agent_get_info(agent, HSA_AGENT_INFO_DEVICE, &device_type)) {
 	  std::cout <<"\n HSA get device type failed";
+    return HSA_STATUS_ERROR; 
   }
 
   if (HSA_STATUS_SUCCESS != hsa_agent_get_info(agent, HSA_AGENT_INFO_NODE, &node)) {
-          std::cout << "\n HSA get node failed";
+    std::cout << "\n HSA get node failed";
+    return HSA_STATUS_ERROR; 
   }
 
   agent_info.node = node;
@@ -290,17 +292,21 @@ int Allocate(int SrcAgent, int DstAgent, size_t Size,
       hsa_amd_memory_pool_access_t access = HSA_AMD_MEMORY_POOL_ACCESS_NEVER_ALLOWED;
 
       if (agent_list[SrcAgent].agent_device_type == "CPU") {
-        if (HSA_STATUS_SUCCESS != (status = hsa_amd_agent_memory_pool_get_info( agent_list[DstAgent].agent,
+        if (HSA_STATUS_SUCCESS != hsa_amd_agent_memory_pool_get_info( agent_list[DstAgent].agent,
         							agent_list[SrcAgent].mem_pool_list[j],
        								 HSA_AMD_AGENT_MEMORY_POOL_INFO_ACCESS,
-        							&access)))
-          std::cout <<"\n HSA pool access failed";
-      } else {
+        							&access)) {
+          std:: cout <<"\n HSA pool access failed";
+          return -1;
+        }
+      } else { 
         if (HSA_STATUS_SUCCESS != (status = hsa_amd_agent_memory_pool_get_info( agent_list[SrcAgent].agent,
         									agent_list[DstAgent].mem_pool_list[j],
         									HSA_AMD_AGENT_MEMORY_POOL_INFO_ACCESS,
-        									&access)))
+        									&access))) {
           std::cout <<"\n HSA pool access failed";
+          return -1;
+        }
       }
 
       if (access == HSA_AMD_MEMORY_POOL_ACCESS_NEVER_ALLOWED) {
@@ -331,7 +337,7 @@ int Allocate(int SrcAgent, int DstAgent, size_t Size,
       }
 
       if (status != HSA_STATUS_SUCCESS) {
-	std::cout << "\n Access grant issues ";
+	      std::cout << "\n Access grant issues ";
         // do cleanup
         hsa_amd_memory_pool_free(dstbuff);
         dstbuff = nullptr;
@@ -359,17 +365,21 @@ void InitAgents() {
   hsa_status_t status;
 
   // Initialize Roc Runtime
-  if (HSA_STATUS_SUCCESS != (status = hsa_init()))
+  if (HSA_STATUS_SUCCESS != (status = hsa_init())) {
       std::cout << "\n HSA Init failed ";       
+      return;
+  }
 
   // Initialize profiling
   if (HSA_STATUS_SUCCESS != hsa_amd_profiling_async_copy_enable(true)) {
      std::cout << "\n HSA asyn copy enable failed";
+     return;
   }
 
   // Populate the lists of agents
   if (HSA_STATUS_SUCCESS != hsa_iterate_agents(ProcessAgent, &agent_list)) {
      std::cout << "\n Populating agents failed";
+     return;
   }
 
   for (uint32_t i = 0; i < agent_list.size(); i++) {
@@ -377,6 +387,7 @@ void InitAgents() {
        if (HSA_STATUS_SUCCESS != hsa_amd_agent_iterate_memory_pools(
                   agent_list[i].agent, ProcessMemPool, &agent_list[i])) {
 	       std::cout << "\n Processing memory pool failed";
+         return;
        }
        std::cout << " \n  Device Type : " << agent_list[i].agent_device_type;
   }
@@ -389,7 +400,6 @@ int test(int reps)
   hsa_amd_memory_pool_t src_pool_fwd;
   hsa_amd_memory_pool_t dst_pool_fwd;
   hsa_signal_t          signal_fwd;
-  hsa_status_t          status;
   double                Duration;
 
   void* src_ptr_fwd = nullptr;
@@ -412,7 +422,7 @@ int test(int reps)
 
   // Create a signal to wait on copy operation
   if (HSA_STATUS_SUCCESS != hsa_signal_create(1, 0, NULL, &signal_fwd)) {
-       std::cout << "\n Signal creation failed";
+      std::cout << "\n Signal creation failed";
       hsa_amd_memory_pool_free(src_ptr_fwd);
       hsa_amd_memory_pool_free(dst_ptr_fwd);
       return -1;
@@ -425,8 +435,10 @@ int test(int reps)
                 dst_ptr_fwd, agent_list[dst_ix_fwd].agent,
                 src_ptr_fwd, agent_list[src_ix_fwd].agent,
                 Size,
-                0, NULL, signal_fwd))
+                0, NULL, signal_fwd)) {
       std::cout << "\n Async copy failed";
+      return -1;
+  }
 
   // wait for transfer to complete
   hsa_signal_wait_acquire(signal_fwd, HSA_SIGNAL_CONDITION_LT, 1, uint64_t(-1), HSA_WAIT_STATE_ACTIVE);
