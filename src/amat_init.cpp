@@ -38,6 +38,7 @@ extern "C" {
 #include <vector>
 
 #include "inc/pci_caps.h"
+#include "inc/amat_init.h"
 
 #include "hsa/hsa.h"
 #include "hsa/hsa_ext_amd.h"
@@ -48,24 +49,6 @@ using std::string;
 using std::vector;
 
 
-struct AgentInformation {
-    //! HSA agent handle
-    hsa_agent_t                   agent;
-    //! agent name
-    string                        agent_name;
-    //! device type, can be "GPU" or "CPU"
-    string                        agent_device_type;
-    //! NUMA node this agent belongs to
-    uint32_t                      node;
-    //! system memory pool
-    hsa_amd_memory_pool_t         sys_pool;
-    /** vector of memory pool HSA handles as reported during mem pool
-    * enumeration
-    **/
-    vector<hsa_amd_memory_pool_t> mem_pool_list;
-    //! vecor of mem pools max sizes (index alligned with mem_pool_list)
-    vector<size_t>                max_size_list;
-};
 
 //! array of all found HSA agents
 vector<AgentInformation> agent_list;
@@ -466,9 +449,34 @@ int test(int reps)
 }
 
 
+void SetupFPGA(void *fpga_mapptr) {
+
+    int fd = -1;
+
+    if ((fd = open("/dev/xdma0_bypass", O_RDWR | O_SYNC)) == -1) {
+           std::cout << "\n Failed to open FPGA device ";
+	         return;
+    }
+
+    if ((userptr = mmap(0, FPGA_MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+			fd, 0)) == (void *)-1) {
+
+      std::cout << "\n Failed to memory map FPGA device";
+	    close(fd);
+	    return;
+   }
+}
+
 int main(int argc, char *argv[])
 {
-    int reps = 10;
+    void *fpga_mapptr;
+    int   reps = 10;
+
+    uint32_t *agentptr;
+    hsa_amd_memory_lock_to_pool(userptr, FPGA_MEM_SIZE, NULL, 0, finegrainpool,
+                                0, (void **)&agentptr);
+
+    SetupFPGA(fpga_mapptr);
 
     InitAgents();
 
