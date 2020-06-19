@@ -38,13 +38,16 @@ extern "C" {
 #include <vector>
 
 #include "inc/pci_caps.h"
-#include "inc/amat_init.h"
 
 #include "hsa/hsa.h"
 #include "hsa/hsa_ext_amd.h"
 
 #include <chrono>
 
+#include "inc/amat_init.h"
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
 using std::string;
 using std::vector;
 
@@ -393,13 +396,34 @@ int test(int reps)
 
   void* src_ptr_fwd = nullptr;
   void* dst_ptr_fwd = nullptr;
+  void* dst_fpga   = nullptr;
+  void* userptr;
   int32_t src_ix_fwd;
   int32_t dst_ix_fwd;
   int sts;
+  int fd = -1;
 
-  src_ix_fwd = 2;
-  dst_ix_fwd = 9;
+  src_ix_fwd = 1;
+  dst_ix_fwd = 5;
   int Size = 1024;
+
+  //Setting up FPGA
+  //=======================================================
+  if ((fd = open("/dev/xdma0_bypass", O_RDWR | O_SYNC)) == -1) {
+           std::cout << "\n Failed to open FPGA device ";
+	         return -1;
+  }
+
+  if ((dst_fpga = mmap(0, FPGA_MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+         		fd, 0)) == (void *)-1) {
+
+      std::cout << "\n Failed to memory map FPGA device";
+	    close(fd);
+	    return -1;
+  }
+  //=====================================================
+ 
+
   
   // allocate buffers and grant permissions for forward transfer
   sts = Allocate(src_ix_fwd, dst_ix_fwd, Size,
@@ -409,6 +433,7 @@ int test(int reps)
     return -1;
   }
 
+#ifdef P2P
   // Create a signal to wait on copy operation
   if (HSA_STATUS_SUCCESS != hsa_signal_create(1, 0, NULL, &signal_fwd)) {
       std::cout << "\n Signal creation failed";
@@ -416,6 +441,13 @@ int test(int reps)
       hsa_amd_memory_pool_free(dst_ptr_fwd);
       return -1;
   }
+#endif
+
+  if (HSA_STATUS_SUCCESS != hsa_memory_copy(dst_fpga, src_ptr_fwd, Size)) {
+      std::cout << "\n HSA copy to FPGA failed";
+  }
+
+#ifdef P2P
 
   // initiate forward transfer
   hsa_signal_store_relaxed(signal_fwd, 1);
@@ -440,6 +472,7 @@ int test(int reps)
   Duration = GetCopyTime(signal_fwd)/1000000000;
 
   std::cout << " \n Time taken to transfer : " << Duration;
+#endif
 
   hsa_amd_memory_pool_free(src_ptr_fwd);
   hsa_amd_memory_pool_free(dst_ptr_fwd);
@@ -449,34 +482,9 @@ int test(int reps)
 }
 
 
-void SetupFPGA(void *fpga_mapptr) {
-
-    int fd = -1;
-
-    if ((fd = open("/dev/xdma0_bypass", O_RDWR | O_SYNC)) == -1) {
-           std::cout << "\n Failed to open FPGA device ";
-	         return;
-    }
-
-    if ((userptr = mmap(0, FPGA_MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
-			fd, 0)) == (void *)-1) {
-
-      std::cout << "\n Failed to memory map FPGA device";
-	    close(fd);
-	    return;
-   }
-}
-
 int main(int argc, char *argv[])
 {
-    void *fpga_mapptr;
     int   reps = 10;
-
-    uint32_t *agentptr;
-    hsa_amd_memory_lock_to_pool(userptr, FPGA_MEM_SIZE, NULL, 0, finegrainpool,
-                                0, (void **)&agentptr);
-
-    SetupFPGA(fpga_mapptr);
 
     InitAgents();
 
